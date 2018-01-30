@@ -1,2 +1,4 @@
 A2
 build/*
+imgui.ini
+Makefile
