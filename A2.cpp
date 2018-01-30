@@ -22,22 +22,19 @@ VertexData::VertexData()
 }
 
 //TODO fill in my implementation
-mat4 my_translate( vec3 v ) {
-    mat4 identity;
-    return glm::translate( identity, v );
+mat4 my_translate( mat4 A, vec3 v ) {
+    return glm::translate( A, v );
 }
 
-mat4 my_rotate( vec3 angles ) {
-    mat4 A;
+mat4 my_rotate( mat4 A, vec3 angles ) {
     A = glm::rotate( A, angles[0], vec3(1, 0, 0) );
     A = glm::rotate( A, angles[1], vec3(0, 1, 0) );
     A = glm::rotate( A, angles[2], vec3(0, 0, 1) );
     return A;
 }
 
-mat4 my_scale( vec3 scale ) {
-    mat4 identity;
-    return glm::scale( identity, scale );
+mat4 my_scale( mat4 A, vec3 scale ) {
+    return glm::scale( A, scale );
 
 }
 
@@ -238,22 +235,19 @@ void A2::appLogic()
     vec3 cube_colour(1.0f, 0.7f, 0.8f);
 
 
-    mat4 P, V, M;
+    // draw world axis
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, VT*VR, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, VT*VR, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, VT*VR, mat4() );
 
-    V = my_rotate( vec3(m_view_rot_x, m_view_rot_y, m_view_rot_z) ) * V;
-    V = my_translate( vec3(m_view_trans_x, m_view_trans_y, m_view_trans_z) ) * V;
-
-    M = my_scale( vec3(m_model_scale_x, m_model_scale_y, m_model_scale_z) ) * M;
-    M = my_rotate( vec3(m_model_rot_x, m_model_rot_y, m_model_rot_z) ) * M;
-    M = my_translate( vec3(m_model_trans_x, m_model_trans_y, m_model_trans_z) ) * M;
 
     // the cube and its axis
     for ( int i = 0; i < 12; i++ ) {
-        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, P, V, M );
+        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, P, VT*VR, MT*MR*MS );
     }
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, V, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, V, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, VT*VR, MT*MR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, VT*VR, MT*MR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, VT*VR, MT*MR );
 
 
     //// Draw outer square:
@@ -411,15 +405,17 @@ bool A2::mouseMoveEvent (
     if (!ImGui::IsMouseHoveringAnyWindow()) {
 
         if ( m_interaction_mode == INTERACTION_MODE::ROTATE_VIEW ) {
-            if ( m_left_mouse_key_down )    m_view_rot_x += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_view_rot_y += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_view_rot_z += ( xPos - m_mouse_x ) / 100.0f;
+            float rot = ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down ) {      VR = my_rotate( VR, vec3( rot, 0, 0 ) ); }
+            if ( m_middle_mouse_key_down ) {    VR = my_rotate( VR, vec3( 0, rot, 0 ) ); }
+            if ( m_right_mouse_key_down ) {     VR = my_rotate( VR, vec3( 0, 0, rot ) ); }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::TRANSLATE_VIEW ) {
-            if ( m_left_mouse_key_down )    m_view_trans_x += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_view_trans_y += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_view_trans_z += ( xPos - m_mouse_x ) / 100.0f;
+            float trans = ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down ) {      VT = my_translate( VT, vec3( trans, 0, 0 ) ); }
+            if ( m_middle_mouse_key_down ) {    VT = my_translate( VT, vec3( 0, trans, 0 ) ); }
+            if ( m_right_mouse_key_down ) {     VT = my_translate( VT, vec3( 0, 0, trans ) ); }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::PERSPECTIVE ) {
@@ -429,21 +425,24 @@ bool A2::mouseMoveEvent (
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::ROTATE_MODEL ) {
-            if ( m_left_mouse_key_down )    m_model_rot_x += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_model_rot_y += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_model_rot_z += ( xPos - m_mouse_x ) / 100.0f;
+            float rot = ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down ) {      MR = my_rotate( MR, vec3( rot, 0, 0 ) ); }
+            if ( m_middle_mouse_key_down ) {    MR = my_rotate( MR, vec3( 0, rot, 0 ) ); }
+            if ( m_right_mouse_key_down ) {     MR = my_rotate( MR, vec3( 0, 0, rot ) ); }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::TRANSLATE_MODEL ) {
-            if ( m_left_mouse_key_down )    m_model_trans_x += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_model_trans_y += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_model_trans_z += ( xPos - m_mouse_x ) / 100.0f;
+            float trans = ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down ) {      MT = my_translate( MT, vec3( trans, 0, 0 ) ); }
+            if ( m_middle_mouse_key_down ) {    MT = my_translate( MT, vec3( 0, trans, 0 ) ); }
+            if ( m_right_mouse_key_down ) {     MT = my_translate( MT, vec3( 0, 0, trans ) ); }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::SCALE_MODEL ) {
-            if ( m_left_mouse_key_down )    m_model_scale_x += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_model_scale_y += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_model_scale_z += ( xPos - m_mouse_x ) / 100.0f;
+            float scale = 1 + ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down ) {      MS = my_scale( MS, vec3( scale, 1, 1 ) ); }
+            if ( m_middle_mouse_key_down ) {    MS = my_scale( MS, vec3( 1, scale, 1 ) ); }
+            if ( m_right_mouse_key_down ) {     MS = my_scale( MS, vec3( 1, 1, scale ) ); }
         }
 
         m_mouse_x = xPos;
@@ -611,19 +610,8 @@ void A2::reset() {
     m_pers_n = 0;
     m_pers_f = 0;
 
-    m_model_rot_x = 0;
-    m_model_rot_y = 0;
-    m_model_rot_z = 0;
+    MT = mat4();
+    MR = mat4();
+    MS = mat4();
 
-    m_model_trans_x = 0;
-    m_model_trans_y = 0;
-    m_model_trans_z = 0;
-
-    m_model_scale_x = 1;
-    m_model_scale_y = 1;
-    m_model_scale_z = 1;
-
-    //M = mat4();
-    //V = mat4();
-    //P = mat4();
 }

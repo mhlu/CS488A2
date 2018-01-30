@@ -83,8 +83,6 @@ protected:
 
     glm::vec3 m_currentLineColour;
 
-    //mat4 M, V, P;
-
 
     enum INTERACTION_MODE { ROTATE_VIEW, TRANSLATE_VIEW, PERSPECTIVE,
                             ROTATE_MODEL, TRANSLATE_MODEL, SCALE_MODEL,
@@ -106,17 +104,14 @@ protected:
     double m_pers_n;
     double m_pers_f;
 
-    double m_model_rot_x;
-    double m_model_rot_y;
-    double m_model_rot_z;
+    glm::mat4 P;
 
-    double m_model_trans_x;
-    double m_model_trans_y;
-    double m_model_trans_z;
+    glm::mat4 VT;
+    glm::mat4 VR;
 
-    double m_model_scale_x;
-    double m_model_scale_y;
-    double m_model_scale_z;
+    glm::mat4 MT;
+    glm::mat4 MR;
+    glm::mat4 MS;
 
     double m_mouse_x;
 };
