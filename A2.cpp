@@ -27,9 +27,12 @@ mat4 my_translate( vec3 v ) {
     return glm::translate( identity, v );
 }
 
-mat4 my_rotate( float angle, vec3 axis ) {
-    mat4 identity;
-    return glm::rotate( identity, angle, axis );
+mat4 my_rotate( vec3 angles ) {
+    mat4 A;
+    A = glm::rotate( A, angles[0], vec3(1, 0, 0) );
+    A = glm::rotate( A, angles[1], vec3(0, 1, 0) );
+    A = glm::rotate( A, angles[2], vec3(0, 0, 1) );
+    return A;
 }
 
 mat4 my_scale( vec3 scale ) {
@@ -212,7 +215,6 @@ void A2::appLogic()
     // Call at the beginning of frame, before drawing lines:
     initLineData();
 
-    mat4 P, V, M;
 
     // Draw Cube
     vec3 cube_coords[][2] = {
@@ -235,14 +237,29 @@ void A2::appLogic()
     };
     vec3 cube_colour(1.0f, 0.7f, 0.8f);
 
+
+    mat4 P, V, M;
+
+    V = my_rotate( vec3(m_view_rot_x, m_view_rot_y, m_view_rot_z) ) * V;
+    V = my_translate( vec3(m_view_trans_x, m_view_trans_y, m_view_trans_z) ) * V;
+
+    M = my_scale( vec3(m_model_scale_x, m_model_scale_y, m_model_scale_z) ) * M;
+    M = my_rotate( vec3(m_model_rot_x, m_model_rot_y, m_model_rot_z) ) * M;
+    M = my_translate( vec3(m_model_trans_x, m_model_trans_y, m_model_trans_z) ) * M;
+
+    // the cube and its axis
     for ( int i = 0; i < 12; i++ ) {
         draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, P, V, M );
     }
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, V, mat4() );
+
 
     //// Draw outer square:
     //setLineColour(vec3(1.0f, 0.7f, 0.8f));
     //drawLine(vec2(-0.5f, -0.5f), vec2(0.5f, -0.5f));
-    //drawLine(vec2(0.5f, -0.5f), vec2(0.5f, 0.5f));
+    //drawLine(vec2(0.5f, -0.5f), vec2(0.5f, 0.5f))1
     //drawLine(vec2(0.5f, 0.5f), vec2(-0.5f, 0.5f));
     //drawLine(vec2(-0.5f, 0.5f), vec2(-0.5f, -0.5f));
 
@@ -261,8 +278,11 @@ void A2::draw3DLine (
         const vec3 & v0, const vec3 & v1, const vec3 & colour,
         mat4 P, mat4 V, mat4 M) {
 
-    vec2 start = vec2(v0[0], v0[1]);
-    vec2 end = vec2(v1[0], v1[1]);
+    vec4 final_v0 = V * M * vec4(v0, 1);
+    vec4 final_v1 = V * M * vec4(v1, 1);
+
+    vec2 start = vec2( final_v0[0], final_v0[1] );
+    vec2 end = vec2( final_v1[0], final_v1[1] );
 
     start[0] = start[0]/2;
     start[1] = start[1]/2;
@@ -295,14 +315,8 @@ void A2::guiLogic()
             windowFlags);
 
 
-        // Add more gui elements here here ...
-
-
-        // Create Button, and check if it was clicked:
-        if( ImGui::Button( "Quit Application" ) ) {
-            glfwSetWindowShouldClose(m_window, GL_TRUE);
-        }
-
+        if( ImGui::Button( "Quit Application" ) ) { glfwSetWindowShouldClose(m_window, GL_TRUE); }
+        if( ImGui::Button( "Reset" ) ) { reset(); }
 
         if ( ImGui::RadioButton( "Rotate View",      &interaction_radio, 0 ) ) { m_interaction_mode = INTERACTION_MODE::ROTATE_VIEW; }
         if ( ImGui::RadioButton( "Translate View",   &interaction_radio, 1 ) ) { m_interaction_mode = INTERACTION_MODE::TRANSLATE_VIEW; }
@@ -427,9 +441,9 @@ bool A2::mouseMoveEvent (
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::SCALE_MODEL ) {
-            if ( m_left_mouse_key_down )    m_scale_rot_x += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_scale_rot_y += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_scale_rot_z += ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down )    m_model_scale_x += ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_middle_mouse_key_down )  m_model_scale_y += ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_right_mouse_key_down )   m_model_scale_z += ( xPos - m_mouse_x ) / 100.0f;
         }
 
         m_mouse_x = xPos;
@@ -581,7 +595,10 @@ bool A2::keyInputEvent (
 }
 
 void A2::reset() {
+
+    interaction_radio = 0;
     m_interaction_mode =  INTERACTION_MODE::ROTATE_VIEW;
+
     m_view_rot_x = 0;
     m_view_rot_y = 0;
     m_view_rot_z = 0;
@@ -602,7 +619,11 @@ void A2::reset() {
     m_model_trans_y = 0;
     m_model_trans_z = 0;
 
-    m_scale_rot_x = 1;
-    m_scale_rot_y = 1;
-    m_scale_rot_z = 1;
+    m_model_scale_x = 1;
+    m_model_scale_y = 1;
+    m_model_scale_z = 1;
+
+    //M = mat4();
+    //V = mat4();
+    //P = mat4();
 }
