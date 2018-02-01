@@ -13,6 +13,31 @@ using namespace std;
 using namespace glm;
 
 
+
+bool clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
+  float wecA = dot( (A - P), n );
+  float wecB = dot( (B - P), n );
+
+  if ( wecA < 0 && wecB < 0) {
+    return false;
+  }
+
+  if ( !(wecA >= 0 && wecB >= 0) ) {
+    float t = wecA / (wecA - wecB);
+    if ( wecA < 0 ) {
+      A = A + (B - A) * t;
+    } else {
+      B = A + (B - A) * t;
+    }
+  }
+
+  return true;
+}
+
+
+//mat4 perspective_matrix(
+
+
 //----------------------------------------------------------------------------------------
 // Constructor
 VertexData::VertexData()
@@ -34,13 +59,13 @@ mat4 my_rotate( float angle, char axis ) {
     mat4 I;
 
     if ( axis == 'x' )
-        return glm::rotate( I, angle, vec3(1, 0, 0) );
+        return glm::rotate( I, angle, vec3(1.0, 0.0, 0.0) );
 
     if ( axis == 'y' )
-        return glm::rotate( I, angle, vec3(0, 1, 0) );
+        return glm::rotate( I, angle, vec3(0.0, 1.0, 0.0) );
 
     if ( axis == 'z' )
-        return glm::rotate( I, angle, vec3(0, 0, 1) );
+        return glm::rotate( I, angle, vec3(0.0, 0.0, 1.0) );
 }
 
 mat4 my_scale( vec3 scale ) {
@@ -247,9 +272,9 @@ void A2::appLogic()
 
 
     // draw world axis
-    //draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, m_view_V, mat4() );
-    //draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, m_view_V, mat4() );
-    //draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, m_view_V, mat4() );
 
 
     // the cube and its axis
@@ -283,11 +308,20 @@ void A2::draw3DLine (
         const vec3 & v0, const vec3 & v1, const vec3 & colour,
         mat4 P, mat4 V, mat4 M) {
 
-    vec4 final_v0 = V * M * vec4(v0, 1);
-    vec4 final_v1 = V * M * vec4(v1, 1);
+    vec4 v00 = V * M * vec4(v0, 1);
+    vec4 v11 = V * M * vec4(v1, 1);
+    vec3 a = vec3( v00 );
+    vec3 b = vec3( v11 );
 
-    vec2 start = vec2( final_v0[0], final_v0[1] );
-    vec2 end = vec2( final_v1[0], final_v1[1] );
+    bool not_clipped = true;
+    not_clipped &= clipPlane( a, b, vec3(0.0f, 0.0f, m_n), vec3(0.0, 0.0f, 1.0f) );
+    not_clipped &= clipPlane( a, b, vec3(0.0f, 0.0f, m_f), vec3(0.0, 0.0f, -1.0f) );
+
+
+
+
+    vec2 start = vec2( a[0], a[1] );
+    vec2 end = vec2( b[0], b[1] );
 
     start[0] = start[0]/2;
     start[1] = start[1]/2;
@@ -426,7 +460,7 @@ bool A2::mouseMoveEvent (
 
             if ( axis == 'x' || axis == 'y' || axis == 'z' ) {
                 m_view_V *= my_translate( m_view_pos );
-                m_view_V *= my_rotate( -rot, axis );
+                m_view_V = my_rotate( -rot, axis ) * m_view_V;
                 m_view_V *= my_translate( -m_view_pos );
             }
         }
@@ -626,7 +660,7 @@ void A2::reset() {
     m_model_TR = mat4();
     m_model_S = mat4();
 
-    m_view_pos = vec3(0, 0, 6);
+    m_view_pos = vec3(0.0, 0.0, 6.0);
     m_view_V = mat4();
     m_view_V *= my_translate(-m_view_pos);
 
