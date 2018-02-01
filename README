@@ -1,0 +1,13 @@
+Compilation:
+    - no changes from default
+
+premake4 clean
+premake4 gmake
+make
+./A2
+
+Manual:
+
+    I set some restriction to some values:
+        10 <= fov <= 50
+        0 < near < far < 100

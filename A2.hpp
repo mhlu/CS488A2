@@ -70,6 +70,7 @@ protected:
     );
     glm::vec3 project_normalize( glm::vec3 v );
 
+    void to_view( glm::vec4 &P, glm::vec4 &Q );
     void reset();
 
     ShaderProgram m_shader;
@@ -85,12 +86,18 @@ protected:
 
     enum INTERACTION_MODE { ROTATE_VIEW, TRANSLATE_VIEW, PERSPECTIVE,
                             ROTATE_MODEL, TRANSLATE_MODEL, SCALE_MODEL,
-                            VIEWPORT };
+                            VIEWPORT, VIEWPORT_CLICKED };
     INTERACTION_MODE m_interaction_mode;
     bool m_left_mouse_key_down;
     bool m_middle_mouse_key_down;
     bool m_right_mouse_key_down;
 
+    double m_port_init_x;
+    double m_port_init_y;
+    float m_port_x;
+    float m_port_y;
+    float m_port_w;
+    float m_port_h;
 
     double m_fov;
     double m_n;
@@ -102,5 +109,7 @@ protected:
     glm::mat4 m_model_TR;
     glm::mat4 m_model_S;
 
+
     double m_mouse_x;
+    double m_mouse_y;
 };

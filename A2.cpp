@@ -14,7 +14,11 @@ using namespace std;
 #include <cmath>
 using namespace glm;
 
-
+double clip_float( double v, double min, double max ) {
+    assert( min <= max );
+    if ( v < min ) v = min;
+    if ( v > max ) v = max;
+}
 
 bool clipAgainstPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
 
@@ -60,10 +64,13 @@ bool clip( vec4 &A, vec4 &B) {
 
   for(uint32_t i = 0; i < 6; i++) {
 
-    if((A[3] + P[i]) >= 0 && (B[3] + Q[i]) >= 0)
+    if((A[3] + P[i]) >= 0 && (B[3] + Q[i]) >= 0) {
         continue;
+    }
 
-    if((A[3] + P[i]) < 0 && (B[3] + Q[i]) < 0) return true;
+    if((A[3] + P[i]) < 0 && (B[3] + Q[i]) < 0) {
+        return true;
+    }
 
     float a = (A[3] + P[i]) / ((A[3] + P[i]) - (B[3] + Q[i]));
 
@@ -81,7 +88,6 @@ bool clip( vec4 &A, vec4 &B) {
 }
 
 
-
 void printMatrix( mat4 M ) {
     for ( int i=0; i<4; i++ ) {
         for ( int j=0; j<4; j++ )
@@ -89,6 +95,17 @@ void printMatrix( mat4 M ) {
         cout<<endl;
     }
     cout<<'\n'*5<<endl;
+}
+
+void screen_to_NDC( int x, int y, int W, int H, double &a, double &b ) {
+    if ( x < 0 ) x = 0;
+    if ( x > W ) x = W;
+    if ( y < 0 ) y = 0;
+    if ( y > H ) y = H;
+    y = H - y;
+
+    a = double(x)/W*2 - 1;
+    b = double(y)/H*2 - 1;
 }
 
 mat4 perspective_matrix( double fov, double n, double f ) {
@@ -179,6 +196,7 @@ void A2::init()
     generateVertexBuffers();
 
     mapVboDataToVertexAttributeLocation();
+
 }
 
 //----------------------------------------------------------------------------------------
@@ -336,7 +354,8 @@ void A2::appLogic()
     vec3 cube_colour(1.0f, 0.7f, 0.8f);
 
 
-    // draw world axis
+    // draw port axis
+    glClearColor(0.0, 0.5, 0.5, 1.0);
     draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_view_V );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_view_V );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_view_V );
@@ -349,6 +368,11 @@ void A2::appLogic()
     draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_view_V * m_model_TR );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_view_V * m_model_TR );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_view_V * m_model_TR );
+
+    drawLine( vec2(m_port_x, m_port_y),           vec2(m_port_x+m_port_w, m_port_y) );
+    drawLine( vec2(m_port_x, m_port_y),           vec2(m_port_x, m_port_y+m_port_h) );
+    drawLine( vec2(m_port_x+m_port_w, m_port_y),  vec2(m_port_x+m_port_w, m_port_y+m_port_h) );
+    drawLine( vec2(m_port_x, m_port_y+m_port_h),  vec2(m_port_x+m_port_w, m_port_y+m_port_h) );
 
 }
 
@@ -370,6 +394,8 @@ void A2::draw3DLine ( const vec3 & v0, const vec3 & v1, const vec3 & colour, mat
 
     P = P / P[3];
     Q = Q / Q[3];
+
+    to_view( P, Q );
 
     setLineColour( colour );
     drawLine( vec2( P[0], P[1] ), vec2( Q[0], Q[1] ) );
@@ -521,9 +547,21 @@ bool A2::mouseMoveEvent (
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::PERSPECTIVE ) {
-            if ( m_left_mouse_key_down )    m_fov += delta_x / 100.0f;
-            if ( m_middle_mouse_key_down )  m_n += delta_x / 100.0f;
-            if ( m_right_mouse_key_down )   m_f += delta_x / 100.0f;
+            if ( m_left_mouse_key_down ) {
+                m_fov += delta_x / 10.0f;
+                m_fov = clip_float( m_fov, 10, 50 );
+                m_P = perspective_matrix( m_fov, m_n, m_f );
+            }
+            if ( m_middle_mouse_key_down ) {
+                m_n += delta_x / 100.0f;
+                m_n = clip_float( m_n, 1e-5, m_f );
+                m_P = perspective_matrix( m_fov, m_n, m_f );
+            }
+            if ( m_right_mouse_key_down ) {
+                m_f += delta_x / 100.0f;
+                m_f = clip_float( m_f, m_n+1e-5, 100 );
+                m_P = perspective_matrix( m_fov, m_n, m_f );
+            }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::ROTATE_MODEL ) {
@@ -547,7 +585,28 @@ bool A2::mouseMoveEvent (
             if ( m_right_mouse_key_down ) {     m_model_S *= my_scale( vec3( 1, 1, scale ) ); }
         }
 
+
+        if ( m_interaction_mode == INTERACTION_MODE::VIEWPORT_CLICKED ) {
+
+            int width, height;
+            glfwGetWindowSize(m_window, &width, &height);
+
+            double nx, ny;
+            screen_to_NDC( xPos, yPos, width, height, nx, ny );
+
+            m_port_x = nx < m_port_init_x ? nx : m_port_init_x;
+            m_port_y = ny < m_port_init_y ? ny : m_port_init_y;
+
+            m_port_w  = nx - m_port_init_x;
+            m_port_h = ny - m_port_init_y;
+
+            m_port_w = m_port_w > 0 ? m_port_w : -m_port_w;
+            m_port_h = m_port_h > 0 ? m_port_h : -m_port_h;
+
+        }
+
         m_mouse_x = xPos;
+        m_mouse_y = yPos;
         eventHandled = true;
     }
 
@@ -565,38 +624,49 @@ bool A2::mouseButtonInputEvent (
 ) {
     bool eventHandled(false);
 
-    if (!ImGui::IsMouseHoveringAnyWindow()) {
+    if ( button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS ) {
+        m_left_mouse_key_down = true;
 
-        if ( button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_PRESS ) {
-            m_left_mouse_key_down = true;
-            eventHandled = true;
+        if ( m_interaction_mode == INTERACTION_MODE::VIEWPORT ) {
+            int width, height;
+            glfwGetWindowSize(m_window, &width, &height);
+            screen_to_NDC( m_mouse_x, m_mouse_y, width, height, m_port_init_x, m_port_init_y );
+
+            m_interaction_mode = INTERACTION_MODE::VIEWPORT_CLICKED;
         }
 
-        if ( button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_RELEASE ) {
-            m_left_mouse_key_down = false;
-            eventHandled = true;
+        else if ( m_interaction_mode == INTERACTION_MODE::VIEWPORT_CLICKED ) {
+            m_interaction_mode = INTERACTION_MODE::VIEWPORT;
         }
 
-        if ( button == GLFW_MOUSE_BUTTON_MIDDLE && actions == GLFW_PRESS ) {
-            m_middle_mouse_key_down = true;
-            eventHandled = true;
-        }
-
-        if ( button == GLFW_MOUSE_BUTTON_MIDDLE && actions == GLFW_RELEASE ) {
-            m_middle_mouse_key_down = false;
-            eventHandled = true;
-        }
-
-        if ( button == GLFW_MOUSE_BUTTON_RIGHT && actions == GLFW_PRESS ) {
-            m_right_mouse_key_down = true;
-            eventHandled = true;
-        }
-
-        if ( button == GLFW_MOUSE_BUTTON_RIGHT && actions == GLFW_RELEASE ) {
-            m_right_mouse_key_down = false;
-            eventHandled = true;
-        }
+        eventHandled = true;
     }
+
+    if ( button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_RELEASE ) {
+        m_left_mouse_key_down = false;
+        eventHandled = true;
+    }
+
+    if ( button == GLFW_MOUSE_BUTTON_MIDDLE && actions == GLFW_PRESS ) {
+        m_middle_mouse_key_down = true;
+        eventHandled = true;
+    }
+
+    if ( button == GLFW_MOUSE_BUTTON_MIDDLE && actions == GLFW_RELEASE ) {
+        m_middle_mouse_key_down = false;
+        eventHandled = true;
+    }
+
+    if ( button == GLFW_MOUSE_BUTTON_RIGHT && actions == GLFW_PRESS ) {
+        m_right_mouse_key_down = true;
+        eventHandled = true;
+    }
+
+    if ( button == GLFW_MOUSE_BUTTON_RIGHT && actions == GLFW_RELEASE ) {
+        m_right_mouse_key_down = false;
+        eventHandled = true;
+    }
+
 
     return eventHandled;
 }
@@ -650,7 +720,7 @@ bool A2::keyInputEvent (
         }
 
         if ( key == GLFW_KEY_A ) {
-            // reset();
+             reset();
             eventHandled = true;
         }
 
@@ -695,7 +765,24 @@ bool A2::keyInputEvent (
     return eventHandled;
 }
 
+void A2::to_view( vec4 &P, vec4 &Q ) {
+
+    float port_center_x = m_port_x+m_port_w/2;
+    float port_center_y = m_port_y+m_port_h/2;
+
+    mat4 T = my_translate( vec3(port_center_x, port_center_y, 0) );
+    mat4 S = my_scale( vec3( m_port_w/2.0f, m_port_h/2.0f, 1) );
+
+    P = T * S * P;
+    Q = T * S * Q;
+}
+
 void A2::reset() {
+
+    m_port_x = -0.9;
+    m_port_y = -0.9;
+    m_port_w = 1.8;
+    m_port_h = 1.8;
 
     interaction_radio = 3;
     m_interaction_mode =  INTERACTION_MODE::ROTATE_MODEL;
@@ -703,12 +790,12 @@ void A2::reset() {
     m_model_TR = mat4();
     m_model_S = mat4();
 
-    m_view_pos = vec3(0.0, 0.0, 5.0);
+    m_view_pos = vec3(0.0, 0.0, 10.0);
     m_view_V = mat4();
     m_view_V *= my_translate(-m_view_pos);
 
     m_fov = 30;
-    m_n = 0.01;
+    m_n = 2;
     m_f = 20;
     m_P = perspective_matrix( m_fov, m_n, m_f );
 
