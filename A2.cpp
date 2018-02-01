@@ -10,6 +10,8 @@ using namespace std;
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
+
+#include <cmath>
 using namespace glm;
 
 
@@ -17,10 +19,10 @@ using namespace glm;
 bool clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
   float wecA = dot( (A - P), n );
   float wecB = dot( (B - P), n );
-
   if ( wecA < 0 && wecB < 0) {
     return false;
   }
+
 
   if ( !(wecA >= 0 && wecB >= 0) ) {
     float t = wecA / (wecA - wecB);
@@ -34,9 +36,28 @@ bool clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
   return true;
 }
 
+void printMatrix( mat4 M ) {
+    for ( int i=0; i<4; i++ ) {
+        for ( int j=0; j<4; j++ )
+            cout<<M[i][j]<<" ";
+        cout<<endl;
+    }
+    cout<<'\n'*5<<endl;
+}
 
-//mat4 perspective_matrix(
-
+mat4 perspective_matrix( double fov, double n, double f ) {
+    fov = fov * ( 2*3.1415926 / 360.0);
+    double c = 1.0/tan(fov/2);
+    mat4 P(
+        c, 0.0f, 0.0f, 0.0f,
+        0.0f, c, 0.0f, 0.0f,
+        0.0f, 0.0f, (f+n)/(f-n), -2*f*n/(f-n),
+        0.0f, 0.0f, 1.0f, 0.0f
+    );
+    cout<<"actual"<<endl;
+    printMatrix(P);
+    return P;
+}
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -272,18 +293,18 @@ void A2::appLogic()
 
 
     // draw world axis
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, m_view_V, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, m_view_V, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_P, m_view_V, mat4() );
 
 
     // the cube and its axis
     for ( int i = 0; i < 12; i++ ) {
-        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, P, m_view_V, m_model_TR*m_model_S );
+        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, m_P, m_view_V, m_model_TR*m_model_S );
     }
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, m_view_V, m_model_TR );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, m_view_V, m_model_TR );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, m_view_V, m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_P, m_view_V, m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_P, m_view_V, m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_P, m_view_V, m_model_TR );
 
 
     //// Draw outer square:
@@ -314,11 +335,19 @@ void A2::draw3DLine (
     vec3 b = vec3( v11 );
 
     bool not_clipped = true;
-    not_clipped &= clipPlane( a, b, vec3(0.0f, 0.0f, m_n), vec3(0.0, 0.0f, 1.0f) );
-    not_clipped &= clipPlane( a, b, vec3(0.0f, 0.0f, m_f), vec3(0.0, 0.0f, -1.0f) );
+    not_clipped = not_clipped && clipPlane( a, b, vec3(0.0f, 0.0f, m_n), vec3(0.0, 0.0f, 1.0f) );
+    not_clipped = not_clipped && clipPlane( a, b, vec3(0.0f, 0.0f, m_f), vec3(0.0, 0.0f, -1.0f) );
+
+    if ( !not_clipped )
+        return;
 
 
-
+    //vec3 aa = project_normalize( a );
+    //vec3 bb = project_normalize( b );
+    //cout<< "aa: " << aa << "a: "<< a <<endl;
+    //cout<< "bb: " << bb << "b: "<< b <<endl;
+    //vec2 start = vec2( aa[0], aa[1] );
+    //vec2 end = vec2( bb[0], bb[1] );
 
     vec2 start = vec2( a[0], a[1] );
     vec2 end = vec2( b[0], b[1] );
@@ -660,12 +689,23 @@ void A2::reset() {
     m_model_TR = mat4();
     m_model_S = mat4();
 
-    m_view_pos = vec3(0.0, 0.0, 6.0);
+    m_view_pos = vec3(0.0, 0.0, -3.0);
     m_view_V = mat4();
-    m_view_V *= my_translate(-m_view_pos);
+    m_view_V = my_translate(-m_view_pos) * m_view_V;
 
     m_fov = 30;
-    m_n = 2;
+    m_n = 0.01;
     m_f = 20;
+    m_P = perspective_matrix( m_fov, m_n, m_f );
 
+}
+
+vec3 A2::project_normalize( vec3 v ) {
+    vec4 res( m_P * vec4(v, 1) );
+    printMatrix( m_P );
+    return vec3(
+        res[ 0 ] /= res[3],
+        res[ 1 ] /= res[3],
+        res[ 2 ] /= res[3]
+        );
 }

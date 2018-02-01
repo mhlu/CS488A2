@@ -70,6 +70,7 @@ protected:
             const glm::mat4 V,
             const glm::mat4 M
     );
+    glm::vec3 project_normalize( glm::vec3 v );
 
     void reset();
 
@@ -97,7 +98,7 @@ protected:
     double m_n;
     double m_f;
 
-    glm::mat4 P;
+    glm::mat4 m_P;
     glm::vec3 m_view_pos;
     glm::mat4 m_view_V;
     glm::mat4 m_model_TR;
