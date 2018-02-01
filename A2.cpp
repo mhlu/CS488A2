@@ -45,20 +45,22 @@ bool clip( vec4 &A, vec4 &B) {
 
   float P[6] = {A[0], -A[0], A[1], -A[1], A[2], -A[2]};
   float Q[6] = {B[0], -B[0], B[1], -B[1], B[2], -B[2]};
+  float Aw = A[3];
+  float Bw = B[3];
 
-  if(A[3] < 1e-5 && B[3] < 1e-5 ) {
+  if(Aw < 1e-5 && Bw < 1e-5 ) {
 
     return true;
 
-  } else if(A[3] < 1e-5) {
+  } else if(Aw < 1e-5) {
 
-    float a = (A[3] - 1e-5) / (A[3] - B[3]);
-    A = A + a*(B-A);
+    float t = (Bw - 1e-5) / (Bw - Aw);
+    A = B + t*(A-B);
 
-  } else if(B[3] < 1e-5) {
+  } else if(Bw < 1e-5) {
 
-    float a = (A[3] - 1e-5) / (A[3] - B[3]);
-    B = A + a*(B-A);
+    float t = (Aw - 1e-5) / (Aw - Bw);
+    B = A + t*(B-A);
 
   }
 
