@@ -92,26 +92,16 @@ protected:
     bool m_middle_mouse_key_down;
     bool m_right_mouse_key_down;
 
-    double m_view_rot_x;
-    double m_view_rot_y;
-    double m_view_rot_z;
 
-    double m_view_trans_x;
-    double m_view_trans_y;
-    double m_view_trans_z;
-
-    double m_pers_fov;
-    double m_pers_n;
-    double m_pers_f;
+    double m_fov;
+    double m_n;
+    double m_f;
 
     glm::mat4 P;
-
-    glm::mat4 VT;
-    glm::mat4 VR;
-
-    glm::mat4 MT;
-    glm::mat4 MR;
-    glm::mat4 MS;
+    glm::vec3 m_view_pos;
+    glm::mat4 m_view_V;
+    glm::mat4 m_model_TR;
+    glm::mat4 m_model_S;
 
     double m_mouse_x;
 };

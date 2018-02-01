@@ -2,6 +2,7 @@
 #include "cs488-framework/GlErrorCheck.hpp"
 
 #include <iostream>
+#include <cassert>
 using namespace std;
 
 #include <imgui/imgui.h>
@@ -10,6 +11,7 @@ using namespace std;
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/io.hpp>
 using namespace glm;
+
 
 //----------------------------------------------------------------------------------------
 // Constructor
@@ -22,19 +24,28 @@ VertexData::VertexData()
 }
 
 //TODO fill in my implementation
-mat4 my_translate( mat4 A, vec3 v ) {
-    return glm::translate( A, v );
+mat4 my_translate( vec3 v ) {
+    mat4 I;
+    return glm::translate( I, v );
 }
 
-mat4 my_rotate( mat4 A, vec3 angles ) {
-    A = glm::rotate( A, angles[0], vec3(1, 0, 0) );
-    A = glm::rotate( A, angles[1], vec3(0, 1, 0) );
-    A = glm::rotate( A, angles[2], vec3(0, 0, 1) );
-    return A;
+mat4 my_rotate( float angle, char axis ) {
+    assert( axis == 'x' or axis == 'y' or axis == 'z' );
+    mat4 I;
+
+    if ( axis == 'x' )
+        return glm::rotate( I, angle, vec3(1, 0, 0) );
+
+    if ( axis == 'y' )
+        return glm::rotate( I, angle, vec3(0, 1, 0) );
+
+    if ( axis == 'z' )
+        return glm::rotate( I, angle, vec3(0, 0, 1) );
 }
 
-mat4 my_scale( mat4 A, vec3 scale ) {
-    return glm::scale( A, scale );
+mat4 my_scale( vec3 scale ) {
+    mat4 I;
+    return glm::scale( I, scale );
 
 }
 
@@ -214,7 +225,7 @@ void A2::appLogic()
 
 
     // Draw Cube
-    vec3 cube_coords[][2] = {
+    static vec3 cube_coords[][2] = {
         { vec3(-1, -1, -1), vec3(1, -1, -1) },
         { vec3(-1, -1, -1), vec3(-1, 1, -1) },
         { vec3(-1, -1, -1), vec3(-1, -1, 1) },
@@ -236,18 +247,18 @@ void A2::appLogic()
 
 
     // draw world axis
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, VT*VR, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, VT*VR, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, VT*VR, mat4() );
+    //draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, m_view_V, mat4() );
+    //draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, m_view_V, mat4() );
+    //draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, m_view_V, mat4() );
 
 
     // the cube and its axis
     for ( int i = 0; i < 12; i++ ) {
-        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, P, VT*VR, MT*MR*MS );
+        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, P, m_view_V, m_model_TR*m_model_S );
     }
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, VT*VR, MT*MR );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, VT*VR, MT*MR );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, VT*VR, MT*MR );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), P, m_view_V, m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), P, m_view_V, m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), P, m_view_V, m_model_TR );
 
 
     //// Draw outer square:
@@ -320,6 +331,7 @@ void A2::guiLogic()
         if ( ImGui::RadioButton( "Scale Model",      &interaction_radio, 5 ) ) { m_interaction_mode = INTERACTION_MODE::SCALE_MODEL; }
         if ( ImGui::RadioButton( "Viewport",         &interaction_radio, 6 ) ) { m_interaction_mode = INTERACTION_MODE::VIEWPORT; }
 
+        ImGui::Text( "near: %.1f, far: %.1f, fov: %.1f", m_n, m_f, m_fov );
         ImGui::Text( "Framerate: %.1f FPS", ImGui::GetIO().Framerate );
 
     ImGui::End();
@@ -402,47 +414,60 @@ bool A2::mouseMoveEvent (
 ) {
     bool eventHandled(false);
 
+    int delta_x = xPos - m_mouse_x;
     if (!ImGui::IsMouseHoveringAnyWindow()) {
 
         if ( m_interaction_mode == INTERACTION_MODE::ROTATE_VIEW ) {
-            float rot = ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_left_mouse_key_down ) {      VR = my_rotate( VR, vec3( rot, 0, 0 ) ); }
-            if ( m_middle_mouse_key_down ) {    VR = my_rotate( VR, vec3( 0, rot, 0 ) ); }
-            if ( m_right_mouse_key_down ) {     VR = my_rotate( VR, vec3( 0, 0, rot ) ); }
+            float rot = delta_x / 100.0f;
+            char axis = '\0';
+            if ( m_left_mouse_key_down ) { axis = 'x'; }
+            if ( m_middle_mouse_key_down ) { axis = 'y'; }
+            if ( m_right_mouse_key_down ) { axis = 'z'; }
+
+            if ( axis == 'x' || axis == 'y' || axis == 'z' ) {
+                m_view_V *= my_translate( m_view_pos );
+                m_view_V *= my_rotate( -rot, axis );
+                m_view_V *= my_translate( -m_view_pos );
+            }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::TRANSLATE_VIEW ) {
-            float trans = ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_left_mouse_key_down ) {      VT = my_translate( VT, vec3( trans, 0, 0 ) ); }
-            if ( m_middle_mouse_key_down ) {    VT = my_translate( VT, vec3( 0, trans, 0 ) ); }
-            if ( m_right_mouse_key_down ) {     VT = my_translate( VT, vec3( 0, 0, trans ) ); }
+            float delta = delta_x / 100.0f;
+            vec3 trans(0,0,0);
+
+            if ( m_left_mouse_key_down ) {      trans[0] = delta; }
+            if ( m_middle_mouse_key_down ) {    trans[1] = delta; }
+            if ( m_right_mouse_key_down ) {     trans[2] = delta; }
+
+            m_view_pos += trans;
+            m_view_V *= my_translate( -trans );
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::PERSPECTIVE ) {
-            if ( m_left_mouse_key_down )    m_pers_fov += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_middle_mouse_key_down )  m_pers_n += ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_right_mouse_key_down )   m_pers_f += ( xPos - m_mouse_x ) / 100.0f;
+            if ( m_left_mouse_key_down )    m_fov += delta_x / 100.0f;
+            if ( m_middle_mouse_key_down )  m_n += delta_x / 100.0f;
+            if ( m_right_mouse_key_down )   m_f += delta_x / 100.0f;
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::ROTATE_MODEL ) {
-            float rot = ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_left_mouse_key_down ) {      MR = my_rotate( MR, vec3( rot, 0, 0 ) ); }
-            if ( m_middle_mouse_key_down ) {    MR = my_rotate( MR, vec3( 0, rot, 0 ) ); }
-            if ( m_right_mouse_key_down ) {     MR = my_rotate( MR, vec3( 0, 0, rot ) ); }
+            float rot = delta_x / 100.0f;
+            if ( m_left_mouse_key_down ) {      m_model_TR *= my_rotate( rot, 'x' ); }
+            if ( m_middle_mouse_key_down ) {    m_model_TR *= my_rotate( rot, 'y' ); }
+            if ( m_right_mouse_key_down ) {     m_model_TR *= my_rotate( rot, 'z' ); }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::TRANSLATE_MODEL ) {
-            float trans = ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_left_mouse_key_down ) {      MT = my_translate( MT, vec3( trans, 0, 0 ) ); }
-            if ( m_middle_mouse_key_down ) {    MT = my_translate( MT, vec3( 0, trans, 0 ) ); }
-            if ( m_right_mouse_key_down ) {     MT = my_translate( MT, vec3( 0, 0, trans ) ); }
+            float trans = delta_x / 100.0f;
+            if ( m_left_mouse_key_down ) {      m_model_TR *= my_translate( vec3( trans, 0, 0 ) ); }
+            if ( m_middle_mouse_key_down ) {    m_model_TR *= my_translate( vec3( 0, trans, 0 ) ); }
+            if ( m_right_mouse_key_down ) {     m_model_TR *= my_translate( vec3( 0, 0, trans ) ); }
         }
 
         if ( m_interaction_mode == INTERACTION_MODE::SCALE_MODEL ) {
-            float scale = 1 + ( xPos - m_mouse_x ) / 100.0f;
-            if ( m_left_mouse_key_down ) {      MS = my_scale( MS, vec3( scale, 1, 1 ) ); }
-            if ( m_middle_mouse_key_down ) {    MS = my_scale( MS, vec3( 1, scale, 1 ) ); }
-            if ( m_right_mouse_key_down ) {     MS = my_scale( MS, vec3( 1, 1, scale ) ); }
+            float scale = 1 + delta_x / 100.0f;
+            if ( m_left_mouse_key_down ) {      m_model_S *= my_scale( vec3( scale, 1, 1 ) ); }
+            if ( m_middle_mouse_key_down ) {    m_model_S *= my_scale( vec3( 1, scale, 1 ) ); }
+            if ( m_right_mouse_key_down ) {     m_model_S *= my_scale( vec3( 1, 1, scale ) ); }
         }
 
         m_mouse_x = xPos;
@@ -547,7 +572,7 @@ bool A2::keyInputEvent (
             eventHandled = true;
         }
 
-        if ( key == GLFW_KEY_R ) {
+        if ( key == GLFW_KEY_A ) {
             // reset();
             eventHandled = true;
         }
@@ -595,23 +620,18 @@ bool A2::keyInputEvent (
 
 void A2::reset() {
 
-    interaction_radio = 0;
-    m_interaction_mode =  INTERACTION_MODE::ROTATE_VIEW;
+    interaction_radio = 3;
+    m_interaction_mode =  INTERACTION_MODE::ROTATE_MODEL;
 
-    m_view_rot_x = 0;
-    m_view_rot_y = 0;
-    m_view_rot_z = 0;
+    m_model_TR = mat4();
+    m_model_S = mat4();
 
-    m_view_trans_x = 0;
-    m_view_trans_y = 0;
-    m_view_trans_z = 0;
+    m_view_pos = vec3(0, 0, 6);
+    m_view_V = mat4();
+    m_view_V *= my_translate(-m_view_pos);
 
-    m_pers_fov = 0;
-    m_pers_n = 0;
-    m_pers_f = 0;
-
-    MT = mat4();
-    MR = mat4();
-    MS = mat4();
+    m_fov = 30;
+    m_n = 2;
+    m_f = 20;
 
 }
