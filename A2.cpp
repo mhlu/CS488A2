@@ -64,7 +64,7 @@ bool clip( vec4 &A, vec4 &B) {
 
   }
 
-  for(uint33_t i = 0; i < 3; i++) {
+  for(int i = 0; i < 3; i++) {
 
     float BL1 = A[3] + A[i];
     float BL2 = B[3] + B[i];
@@ -83,7 +83,6 @@ bool clip( vec4 &A, vec4 &B) {
 
     } else {
       B = A + a*(B-A);
-
     }
 
   }
@@ -144,7 +143,6 @@ mat4 perspective_matrix( double fov, double n, double f ) {
         0.0f, 0.0f, -(n+f)/(f-n), -1.0f,
         0.0f, 0.0f, -2*f*n/(f-n), 0.0f
     );
-    printMatrix(P);
     return P;
 }
 
@@ -160,27 +158,50 @@ VertexData::VertexData()
 
 //TODO fill in my implementation
 mat4 my_translate( vec3 v ) {
-    mat4 I;
-    return glm::translate( I, v );
+    mat4 A(
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        v[0], v[1], v[2], 1.0f);
+    return A;
 }
 
 mat4 my_rotate( float angle, char axis ) {
     assert( axis == 'x' or axis == 'y' or axis == 'z' );
     mat4 I;
 
-    if ( axis == 'x' )
-        return glm::rotate( I, angle, vec3(1.0, 0.0, 0.0) );
+    float ca = cos( angle );
+    float sa = sin( angle );
 
-    if ( axis == 'y' )
-        return glm::rotate( I, angle, vec3(0.0, 1.0, 0.0) );
+    if ( axis == 'x' ) {
+        return mat4( 1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, ca, sa, 0.0f, 
+                0.0f, -sa, ca, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f);
+    }
 
-    if ( axis == 'z' )
-        return glm::rotate( I, angle, vec3(0.0, 0.0, 1.0) );
+    if ( axis == 'y' ) {
+        return mat4( ca, 0.0f, -sa, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f, 
+                sa, 0.0f, ca, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f);
+    }
+
+    if ( axis == 'z' ) {
+        return mat4( ca, sa, 0.0f, 0.0f,
+                -sa, ca, 0.0f, 0.0f, 
+                0.0f, 0.0f, 1.0f, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f);
+    }
 }
 
 mat4 my_scale( vec3 scale ) {
-    mat4 I;
-    return glm::scale( I, scale );
+    mat4 A(
+        scale[0], 0.0f, 0.0f, 0.0f,
+        0.0f, scale[1], 0.0f, 0.0f,
+        0.0f, 0.0f, scale[2], 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
+    return A;
 
 }
 
@@ -550,14 +571,19 @@ bool A2::mouseMoveEvent (
 
         if ( m_interaction_mode == INTERACTION_MODE::ROTATE_VIEW ) {
             float rot = delta_x / 100.0f;
-            char axis = '\0';
-            if ( m_left_mouse_key_down ) { axis = 'x'; }
-            if ( m_middle_mouse_key_down ) { axis = 'y'; }
-            if ( m_right_mouse_key_down ) { axis = 'z'; }
-
-            if ( axis == 'x' || axis == 'y' || axis == 'z' ) {
+            if ( m_left_mouse_key_down ) { 
                 m_view_V *= my_translate( m_view_pos );
-                m_view_V = my_rotate( -rot, axis ) * m_view_V;
+                m_view_V = my_rotate( -rot, 'x' ) * m_view_V;
+                m_view_V *= my_translate( -m_view_pos );
+            }
+            if ( m_middle_mouse_key_down ) { 
+                m_view_V *= my_translate( m_view_pos );
+                m_view_V = my_rotate( -rot, 'y' ) * m_view_V;
+                m_view_V *= my_translate( -m_view_pos );
+            }
+            if ( m_right_mouse_key_down ) { 
+                m_view_V *= my_translate( m_view_pos );
+                m_view_V = my_rotate( -rot, 'z' ) * m_view_V;
                 m_view_V *= my_translate( -m_view_pos );
             }
         }
@@ -661,13 +687,15 @@ bool A2::mouseButtonInputEvent (
             screen_to_NDC( m_mouse_x, m_mouse_y, width, height, m_port_init_x, m_port_init_y );
 
             m_interaction_mode = INTERACTION_MODE::VIEWPORT_CLICKED;
+            eventHandled = true;
         }
+    }
 
-        else if ( m_interaction_mode == INTERACTION_MODE::VIEWPORT_CLICKED ) {
+    if ( button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_RELEASE ) {
+        if ( m_interaction_mode == INTERACTION_MODE::VIEWPORT_CLICKED ) {
             m_interaction_mode = INTERACTION_MODE::VIEWPORT;
+            eventHandled = true;
         }
-
-        eventHandled = true;
     }
 
     if ( button == GLFW_MOUSE_BUTTON_LEFT && actions == GLFW_RELEASE ) {
