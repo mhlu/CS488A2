@@ -66,9 +66,7 @@ protected:
             const glm::vec3 & v0,
             const glm::vec3 & v1,
             const glm::vec3 & colour,
-            const glm::mat4 P,
-            const glm::mat4 V,
-            const glm::mat4 M
+            const glm::mat4 transform
     );
     glm::vec3 project_normalize( glm::vec3 v );
 

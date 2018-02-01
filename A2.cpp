@@ -16,7 +16,8 @@ using namespace glm;
 
 
 
-bool clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
+bool clipAgainstPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
+
   float wecA = dot( (A - P), n );
   float wecB = dot( (B - P), n );
   if ( wecA < 0 && wecB < 0) {
@@ -36,6 +37,51 @@ bool clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
   return true;
 }
 
+bool clip( vec4 &A, vec4 &B) {
+
+  float P[6] = {A[0], -A[0], A[1], -A[1], A[2], -A[2]};
+  float Q[6] = {B[0], -B[0], B[1], -B[1], B[2], -B[2]};
+
+  if(A[3] < 1e-5 && B[3] < 1e-5 ) {
+
+    return true;
+
+  } else if(A[3] < 1e-5) {
+
+    float a = (A[3] - 1e-5) / (A[3] - B[3]);
+    A = A + a*(B-A);
+
+  } else if(B[3] < 1e-5) {
+
+    float a = (A[3] - 1e-5) / (A[3] - B[3]);
+    B = A + a*(B-A);
+
+  }
+
+  for(uint32_t i = 0; i < 6; i++) {
+
+    if((A[3] + P[i]) >= 0 && (B[3] + Q[i]) >= 0)
+        continue;
+
+    if((A[3] + P[i]) < 0 && (B[3] + Q[i]) < 0) return true;
+
+    float a = (A[3] + P[i]) / ((A[3] + P[i]) - (B[3] + Q[i]));
+
+    if( (A[3] + P[i]) < 0) {
+      A = A + a*(B-A);
+
+    } else {
+      B = A + a*(B-A);
+
+    }
+
+  }
+
+  return false;
+}
+
+
+
 void printMatrix( mat4 M ) {
     for ( int i=0; i<4; i++ ) {
         for ( int j=0; j<4; j++ )
@@ -46,15 +92,13 @@ void printMatrix( mat4 M ) {
 }
 
 mat4 perspective_matrix( double fov, double n, double f ) {
-    fov = fov * ( 2*3.1415926 / 360.0);
-    double c = 1.0/tan(fov/2);
+    float c = 1.0f / tan( (fov*(2*M_PI/360.0f)) / 2.0f );
     mat4 P(
         c, 0.0f, 0.0f, 0.0f,
         0.0f, c, 0.0f, 0.0f,
-        0.0f, 0.0f, (f+n)/(f-n), -2*f*n/(f-n),
-        0.0f, 0.0f, 1.0f, 0.0f
+        0.0f, 0.0f, -(n+f)/(f-n), -1.0f,
+        0.0f, 0.0f, -2*f*n/(f-n), 0.0f
     );
-    cout<<"actual"<<endl;
     printMatrix(P);
     return P;
 }
@@ -293,73 +337,43 @@ void A2::appLogic()
 
 
     // draw world axis
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_P, m_view_V, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_P, m_view_V, mat4() );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_P, m_view_V, mat4() );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_view_V );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_view_V );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_view_V );
 
 
     // the cube and its axis
     for ( int i = 0; i < 12; i++ ) {
-        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, m_P, m_view_V, m_model_TR*m_model_S );
+        draw3DLine( cube_coords[i][0], cube_coords[i][1], cube_colour, m_view_V * m_model_TR * m_model_S );
     }
-    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_P, m_view_V, m_model_TR );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_P, m_view_V, m_model_TR );
-    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_P, m_view_V, m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_view_V * m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_view_V * m_model_TR );
+    draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_view_V * m_model_TR );
 
-
-    //// Draw outer square:
-    //setLineColour(vec3(1.0f, 0.7f, 0.8f));
-    //drawLine(vec2(-0.5f, -0.5f), vec2(0.5f, -0.5f));
-    //drawLine(vec2(0.5f, -0.5f), vec2(0.5f, 0.5f))1
-    //drawLine(vec2(0.5f, 0.5f), vec2(-0.5f, 0.5f));
-    //drawLine(vec2(-0.5f, 0.5f), vec2(-0.5f, -0.5f));
-
-
-    //// Draw inner square:
-    //setLineColour(vec3(0.2f, 1.0f, 1.0f));
-    //drawLine(vec2(-0.25f, -0.25f), vec2(0.25f, -0.25f));
-    //drawLine(vec2(0.25f, -0.25f), vec2(0.25f, 0.25f));
-    //drawLine(vec2(0.25f, 0.25f), vec2(-0.25f, 0.25f));
-    //drawLine(vec2(-0.25f, 0.25f), vec2(-0.25f, -0.25f));
 }
 
 /* draw the 3D line onto screen after entire pipeline */
 
-void A2::draw3DLine (
-        const vec3 & v0, const vec3 & v1, const vec3 & colour,
-        mat4 P, mat4 V, mat4 M) {
+void A2::draw3DLine ( const vec3 & v0, const vec3 & v1, const vec3 & colour, mat4 transform) {
 
-    vec4 v00 = V * M * vec4(v0, 1);
-    vec4 v11 = V * M * vec4(v1, 1);
-    vec3 a = vec3( v00 );
-    vec3 b = vec3( v11 );
+    vec4 P = m_P * transform * vec4( v0, 1.0f );
+    vec4 Q = m_P * transform * vec4( v1, 1.0f );
 
-    bool not_clipped = true;
-    not_clipped = not_clipped && clipPlane( a, b, vec3(0.0f, 0.0f, m_n), vec3(0.0, 0.0f, 1.0f) );
-    not_clipped = not_clipped && clipPlane( a, b, vec3(0.0f, 0.0f, m_f), vec3(0.0, 0.0f, -1.0f) );
+    //P =  clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n);
+    //Q =  clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n);
 
-    if ( !not_clipped )
+
+    bool reject = clip( P, Q );
+
+    if ( reject )
         return;
 
-
-    //vec3 aa = project_normalize( a );
-    //vec3 bb = project_normalize( b );
-    //cout<< "aa: " << aa << "a: "<< a <<endl;
-    //cout<< "bb: " << bb << "b: "<< b <<endl;
-    //vec2 start = vec2( aa[0], aa[1] );
-    //vec2 end = vec2( bb[0], bb[1] );
-
-    vec2 start = vec2( a[0], a[1] );
-    vec2 end = vec2( b[0], b[1] );
-
-    start[0] = start[0]/2;
-    start[1] = start[1]/2;
-    end[0] = end[0]/2;
-    end[1] = end[1]/2;
-
+    P = P / P[3];
+    Q = Q / Q[3];
 
     setLineColour( colour );
-    drawLine( start, end );
+    drawLine( vec2( P[0], P[1] ), vec2( Q[0], Q[1] ) );
+
 
 }
 
@@ -689,9 +703,9 @@ void A2::reset() {
     m_model_TR = mat4();
     m_model_S = mat4();
 
-    m_view_pos = vec3(0.0, 0.0, -3.0);
+    m_view_pos = vec3(0.0, 0.0, 5.0);
     m_view_V = mat4();
-    m_view_V = my_translate(-m_view_pos) * m_view_V;
+    m_view_V *= my_translate(-m_view_pos);
 
     m_fov = 30;
     m_n = 0.01;
@@ -709,3 +723,5 @@ vec3 A2::project_normalize( vec3 v ) {
         res[ 2 ] /= res[3]
         );
 }
+
+
