@@ -43,40 +43,66 @@ bool clipAgainstPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
 
 bool clip( vec4 &A, vec4 &B) {
 
-  float P[6] = {A[0], -A[0], A[1], -A[1], A[2], -A[2]};
-  float Q[6] = {B[0], -B[0], B[1], -B[1], B[2], -B[2]};
-  float Aw = A[3];
-  float Bw = B[3];
+  float AA[6] = {A[0], -A[0], A[1], -A[1], A[2], -A[2]};
+  float BB[6] = {B[0], -B[0], B[1], -B[1], B[2], -B[2]};
 
-  if(Aw < 1e-5 && Bw < 1e-5 ) {
+
+  // the algo only works for w>0
+  if(A[3] < 1e-5 && B[3] < 1e-5 ) {
 
     return true;
 
-  } else if(Aw < 1e-5) {
+  } else if(A[3] < 1e-5) {
 
-    float t = (Bw - 1e-5) / (Bw - Aw);
+    float t = (B[3] - 1e-5) / (B[3] - A[3]);
     A = B + t*(A-B);
 
-  } else if(Bw < 1e-5) {
+  } else if(B[3] < 1e-5) {
 
-    float t = (Aw - 1e-5) / (Aw - Bw);
+    float t = (A[3] - 1e-5) / (A[3] - B[3]);
     B = A + t*(B-A);
 
   }
 
-  for(uint32_t i = 0; i < 6; i++) {
+  for(uint33_t i = 0; i < 3; i++) {
 
-    if((A[3] + P[i]) >= 0 && (B[3] + Q[i]) >= 0) {
+    float BL1 = A[3] + A[i];
+    float BL2 = B[3] + B[i];
+    if( BL1 >= 0 && BL2 >= 0) {
         continue;
     }
 
-    if((A[3] + P[i]) < 0 && (B[3] + Q[i]) < 0) {
+    if( BL1 < 0 && BL2 < 0) {
         return true;
     }
 
-    float a = (A[3] + P[i]) / ((A[3] + P[i]) - (B[3] + Q[i]));
+    float a =  BL1 / ( BL1 - BL2);
 
-    if( (A[3] + P[i]) < 0) {
+    if( BL1  < 0) {
+      A = A + a*(B-A);
+
+    } else {
+      B = A + a*(B-A);
+
+    }
+
+  }
+
+  for(int i = 0; i < 3; i++) {
+
+    float BL1 = A[3] - A[i];
+    float BL2 = B[3] - B[i];
+    if( BL1 >= 0 && BL2 >= 0) {
+        continue;
+    }
+
+    if( BL1 < 0 && BL2 < 0) {
+        return true;
+    }
+
+    float a =  BL1 / ( BL1 - BL2);
+
+    if( BL1  < 0) {
       A = A + a*(B-A);
 
     } else {
