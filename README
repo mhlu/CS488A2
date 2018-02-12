@@ -1,3 +1,9 @@
+I think( hope ) I did all the objectives.
+I did near far clipping with plane clipping,
+then I applied the perspective matrix and then
+applied homogenous clipping.
+
+
 Compilation:
     - no changes from default
 
@@ -12,7 +18,15 @@ Manual:
         10 <= fov <= 50
         0 < near < far < 100
 
-    Axis for both world and cube are colour coded the same way:
+    Gnomons for both world and cube are colour coded the same way:
         red: x
         green: y
         blue: z
+
+    Note: before you translate/rotate the cube, the two gnomons would be
+    overlapping, so you only see one.
+
+    Scaling Factor: I played around to get scaling factors that seemed
+    intuitive to me.
+
+     

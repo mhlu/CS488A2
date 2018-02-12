@@ -20,7 +20,8 @@ double clip_float( double v, double min, double max ) {
     if ( v > max ) v = max;
 }
 
-bool clipAgainstPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
+// Plane Clipping For Near Far Plane Before Perspective
+bool clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
 
   float wecA = dot( (A - P), n );
   float wecB = dot( (B - P), n );
@@ -41,6 +42,7 @@ bool clipAgainstPlane( vec3 &A, vec3 &B, vec3 P, vec3 n) {
   return true;
 }
 
+// Homogenous Clipping After Perspective Mapping
 bool clip( vec4 &A, vec4 &B) {
 
   float AA[6] = {A[0], -A[0], A[1], -A[1], A[2], -A[2]};
@@ -64,7 +66,7 @@ bool clip( vec4 &A, vec4 &B) {
 
   }
 
-  for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < 2; i++) {
 
     float BL1 = A[3] + A[i];
     float BL2 = B[3] + B[i];
@@ -87,7 +89,7 @@ bool clip( vec4 &A, vec4 &B) {
 
   }
 
-  for(int i = 0; i < 3; i++) {
+  for(int i = 0; i < 2; i++) {
 
     float BL1 = A[3] - A[i];
     float BL2 = B[3] - B[i];
@@ -403,12 +405,19 @@ void A2::appLogic()
     vec3 cube_colour(1.0f, 0.7f, 0.8f);
 
 
-    // draw port axis
     glClearColor(0.0, 0.5, 0.5, 1.0);
+
+    // world axis
     draw3DLine( vec3(0, 0, 0), vec3(0.3, 0, 0), vec3(1, 0, 0), m_view_V );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_view_V );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_view_V );
 
+    // draw port axis
+    setLineColour( vec3(0.0, 0.0, 1.0) );
+    drawLine( vec2(m_port_x, m_port_y),           vec2(m_port_x+m_port_w, m_port_y) );
+    drawLine( vec2(m_port_x, m_port_y),           vec2(m_port_x, m_port_y+m_port_h) );
+    drawLine( vec2(m_port_x+m_port_w, m_port_y),  vec2(m_port_x+m_port_w, m_port_y+m_port_h) );
+    drawLine( vec2(m_port_x, m_port_y+m_port_h),  vec2(m_port_x+m_port_w, m_port_y+m_port_h) );
 
     // the cube and its axis
     for ( int i = 0; i < 12; i++ ) {
@@ -418,10 +427,6 @@ void A2::appLogic()
     draw3DLine( vec3(0, 0, 0), vec3(0, 0.3, 0), vec3(0, 1, 0), m_view_V * m_model_TR );
     draw3DLine( vec3(0, 0, 0), vec3(0, 0, 0.3), vec3(0, 0, 1), m_view_V * m_model_TR );
 
-    drawLine( vec2(m_port_x, m_port_y),           vec2(m_port_x+m_port_w, m_port_y) );
-    drawLine( vec2(m_port_x, m_port_y),           vec2(m_port_x, m_port_y+m_port_h) );
-    drawLine( vec2(m_port_x+m_port_w, m_port_y),  vec2(m_port_x+m_port_w, m_port_y+m_port_h) );
-    drawLine( vec2(m_port_x, m_port_y+m_port_h),  vec2(m_port_x+m_port_w, m_port_y+m_port_h) );
 
 }
 
@@ -429,12 +434,21 @@ void A2::appLogic()
 
 void A2::draw3DLine ( const vec3 & v0, const vec3 & v1, const vec3 & colour, mat4 transform) {
 
-    vec4 P = m_P * transform * vec4( v0, 1.0f );
-    vec4 Q = m_P * transform * vec4( v1, 1.0f );
+    vec4 P = transform * vec4( v0, 1.0f );
+    vec4 Q = transform * vec4( v1, 1.0f );
 
-    //P =  clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n);
-    //Q =  clipPlane( vec3 &A, vec3 &B, vec3 P, vec3 n);
+    bool accept = true;
+    vec3 A(P);
+    vec3 B(Q);
 
+    accept = accept && clipPlane( A, B, vec3(0.0f, 0.0f, -m_n), vec3(0.0f, 0.0f, -1.0f));
+    accept = accept && clipPlane( A, B, vec3(0.0f, 0.0f, -m_f), vec3(0.0f, 0.0f, 1.0f));
+
+    if ( !accept )
+        return;
+
+    P = m_P * vec4(A, 1);
+    Q = m_P * vec4(B, 1);
 
     bool reject = clip( P, Q );
 
@@ -851,7 +865,7 @@ void A2::reset() {
     m_view_V *= my_translate(-m_view_pos);
 
     m_fov = 30;
-    m_n = 2;
+    m_n = 6;
     m_f = 20;
     m_P = perspective_matrix( m_fov, m_n, m_f );
 
